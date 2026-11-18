@@ -53,7 +53,8 @@ function element(tag, className, text) {
 }
 
 function lightIcon(name) {
-  const icon = element("span", `icon icon-${name}`);
+  const icon = element("span", "icon");
+  icon.dataset.icon = name;
   icon.setAttribute("aria-hidden", "true");
   return icon;
 }
@@ -76,12 +77,22 @@ function measureThinking(step, previous = step) {
 function buildThinkingHeading(heading) {
   const emblem = heading.querySelector(".step-symbol");
   emblem.className = "thinking-emblem";
-  emblem.append(element("span", "brand-mark"), element("span", "thinking-result"));
+  const result = lightIcon("check");
+  result.classList.add("thinking-result");
+  emblem.replaceChildren(element("span", "brand-mark"), result);
   const dots = element("span", "thinking-dots");
   dots.setAttribute("aria-hidden", "true");
   dots.append(element("span"), element("span"), element("span"));
   heading.querySelector(".step-title").setAttribute("aria-live", "polite");
   heading.append(dots, element("span", "thinking-time"));
+}
+
+function renderThinkingText(row, step) {
+  const transcript = row?.querySelector(".thinking-transcript");
+  if (!transcript) return;
+  const follow = transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight < 24;
+  transcript.textContent = step.thinkingText || (step.status === "running" ? "Ожидаю текст анализа…" : "Текст анализа недоступен.");
+  if (follow) transcript.scrollTop = transcript.scrollHeight;
 }
 
 function renderHistory() {
@@ -90,7 +101,8 @@ function renderHistory() {
   const visible = chats.filter((chat) => chat.title.toLocaleLowerCase("ru").includes(query));
   history.replaceChildren();
   for (const chat of visible) {
-    const button = element("button", "history-entry", chat.title);
+    const button = element("button", "history-entry");
+    button.append(lightIcon("chat_bubble"), element("span", "history-label", chat.title));
     button.type = "button";
     button.title = chat.title;
     button.setAttribute("aria-current", String(chat === active));
@@ -103,32 +115,47 @@ function renderHistory() {
 }
 
 function updateTitle() {
-  byId("chat-title").textContent = active.title;
+  const title = byId("chat-title");
+  title.textContent = title.title = active.title;
   chatMenu.hidden = !active.turns.length;
   byId("empty").hidden = active.turns.length > 0;
   thread.hidden = !active.turns.length;
 }
 
+function shouldOpenWork(turn) {
+  return turn.workOpen ?? (!turn.answer || Object.values(turn.openSteps ?? {}).some(Boolean));
+}
+
 function makeTurn(turn) {
   const row = element("article", "turn");
   const bubble = element("p", "bubble question", turn.question);
+  const assistant = element("div", "assistant");
+  assistant.setAttribute("role", "group");
+  assistant.setAttribute("aria-label", "Ответ EvoMind");
+  const avatar = element("span", "assistant-avatar");
+  avatar.setAttribute("aria-hidden", "true");
+  avatar.append(element("span", "brand-mark"));
+  const stack = element("div", "assistant-stack");
   const work = element("details", "work");
-  const heading = element("summary", "", "Ход работы");
+  const heading = element("summary");
   const count = element("span", "work-count");
-  heading.append(count);
+  count.title = "Количество шагов";
+  heading.append(lightIcon("timeline"), element("span", "work-title", "Ход работы"), count, lightIcon("chevron_right"));
   const steps = element("div", "steps");
   work.append(heading, steps);
-  work.open = turn.workOpen ?? true;
+  work.open = shouldOpenWork(turn);
   work.ontoggle = () => {
-    if (turn.workOpen === work.open) return;
+    if (shouldOpenWork(turn) === work.open) return;
     turn.workOpen = work.open;
     if (views.has(turn.id)) saveChats();
   };
-  const reply = element("div", "bubble reply");
+  const reply = element("div", "reply");
   const actions = element("div", "reply-actions");
-  work.hidden = reply.hidden = actions.hidden = true;
-  row.append(bubble, work, reply, actions);
-  const view = { row, work, count, steps, reply, actions, stepRows: new Map() };
+  assistant.hidden = work.hidden = reply.hidden = actions.hidden = true;
+  stack.append(reply, actions, work);
+  assistant.append(avatar, stack);
+  row.append(bubble, assistant);
+  const view = { row, assistant, work, count, steps, reply, actions, stepRows: new Map() };
   views.set(turn.id, view);
   for (const step of turn.steps) renderStep(turn, step);
   if (turn.answer) renderAnswer(turn);
@@ -141,26 +168,39 @@ function renderStep(turn, step) {
   const previousStatus = row?.dataset.status;
   const isGroup = step.group === true;
   const thinking = isThinking(step);
-  const expandable = isGroup || step.details.length > 0 || (step.status === "running" && !thinking);
+  const streamsThinking = thinking && step.streams_text === true;
+  const defaultOpen = isGroup || streamsThinking;
+  const expandable = defaultOpen || step.details.length > 0 || (step.status === "running" && !thinking);
   if (!row) {
     row = element(expandable ? "details" : "div", isGroup ? "step step-group" : "step");
     const heading = element(expandable ? "summary" : "div", "step-heading");
     const symbol = element("span", "step-symbol");
     symbol.setAttribute("aria-hidden", "true");
+    symbol.append(lightIcon("more_horiz"));
     heading.append(symbol, element("span", "step-title"));
     if (thinking) {
       row.classList.add("thinking-step");
       buildThinkingHeading(heading);
     }
-    row.append(heading, element("div", "step-content"));
+    const content = element("div", "step-content");
+    row.append(heading, content);
+    if (streamsThinking) {
+      content.classList.add("thinking-content");
+      const transcript = element("div", "thinking-transcript");
+      transcript.tabIndex = 0;
+      transcript.setAttribute("role", "region");
+      transcript.setAttribute("aria-label", "Текст анализа Qwen");
+      content.append(transcript);
+    }
     if (isGroup) {
       heading.append(element("span", "substep-count"));
       row.append(element("div", "step-children"));
     }
     if (expandable) {
-      row.open = turn.openSteps?.[step.id] ?? isGroup;
+      heading.append(lightIcon("chevron_right"));
+      row.open = turn.openSteps?.[step.id] ?? defaultOpen;
       row.ontoggle = () => {
-        if ((turn.openSteps?.[step.id] ?? isGroup) === row.open) return;
+        if ((turn.openSteps?.[step.id] ?? defaultOpen) === row.open) return;
         turn.openSteps ??= {};
         turn.openSteps[step.id] = row.open;
         if (views.has(turn.id)) saveChats();
@@ -179,12 +219,18 @@ function renderStep(turn, step) {
   row.dataset.status = step.status;
   row.classList.toggle("step-updated", view.row.isConnected && previousStatus !== step.status);
   const heading = row.firstElementChild;
-  const statusIcon = { info: "·", running: "", error: "×", success: "✓" }[step.status] ?? "·";
-  heading.querySelector(thinking ? ".thinking-result" : ".step-symbol").textContent = statusIcon;
+  const statusIcon = { error: "close", success: "check" }[step.status] ?? "more_horiz";
+  heading.querySelector(thinking ? ".thinking-result" : ".step-symbol > .icon").dataset.icon = statusIcon;
   heading.querySelector(".step-title").textContent = thinking && step.status === "error" ? "Анализ задачи прерван" : step.title;
   if (thinking) {
     heading.querySelector(".thinking-time").textContent =
       Number.isFinite(step.elapsedMs) ? `${seconds.format(step.elapsedMs / 1000)} с` : "";
+  }
+  view.assistant.hidden = view.work.hidden = false;
+  view.count.textContent = String(turn.steps.length);
+  if (streamsThinking) {
+    renderThinkingText(row, step);
+    return;
   }
   const content = row.querySelector(":scope > .step-content");
   const details = step.details.map(({ label, text, code }) => {
@@ -203,43 +249,95 @@ function renderStep(turn, step) {
   }
   content.replaceChildren(...details);
   content.hidden = !details.length;
-  view.work.hidden = false;
-  view.count.textContent = String(turn.steps.length);
+}
+
+function readResult(text) {
+  const formula = /^Формула — (.+)\nРезультат — (.+)\.$/u.exec(text);
+  if (formula) return { value: formula[2], input: formula[1], inputLabel: "Формула", code: false };
+
+  const tool = /^Вход инструмента — (\{.*\})\. Результат — (.+)\.$/u.exec(text);
+  if (!tool) return null;
+  try {
+    JSON.parse(tool[1]);
+    const value = JSON.parse(tool[2]);
+    return {
+      value: typeof value === "string" && value !== "" ? value : tool[2],
+      input: tool[1],
+      inputLabel: "Вход инструмента",
+      code: value !== null && typeof value === "object",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function renderResult({ value, input, inputLabel, code }) {
+  const result = element("dl", "answer-readout");
+  const main = element("div", "answer-main");
+  const valueNode = element("dd", "answer-value", code ? undefined : value);
+  if (code) {
+    const pre = element("pre");
+    pre.append(element("code", "", value));
+    valueNode.append(pre);
+  } else if (value.length <= 24 && !value.includes("\n")) {
+    valueNode.classList.add("answer-emphasis");
+  }
+  main.append(element("dt", "answer-label", "Результат"), valueNode);
+  const evidence = element("div", "answer-evidence");
+  const inputNode = element("dd");
+  inputNode.append(element("code", "", input));
+  evidence.append(element("dt", "answer-label", inputLabel), inputNode);
+  result.append(main, evidence);
+  return result;
 }
 
 function renderAnswer(turn) {
-  const { reply, actions } = views.get(turn.id);
+  const { assistant, reply, actions, work } = views.get(turn.id);
   const { text, ok } = turn.answer;
   const fencedCode = /\n{2}````python\n([\s\S]*?)\n````\s*$/;
   const match = text.match(fencedCode);
-  reply.replaceChildren(element("div", "", match ? text.slice(0, match.index).trimEnd() : text));
+  const prefix = match ? text.slice(0, match.index).trimEnd() : text;
+  const sourceLabel = "\n\nКод инструмента";
+  const sourceNamed = match && prefix.endsWith(sourceLabel);
+  const body = sourceNamed ? prefix.slice(0, -sourceLabel.length) : prefix;
+  const result = ok ? readResult(body) : null;
+  reply.replaceChildren(result ? renderResult(result) : element("div", "", body));
   if (match) {
     const pre = element("pre");
     pre.append(element("code", "", match[1]));
-    reply.append(pre);
+    const source = element("div", "answer-source");
+    if (sourceNamed) source.append(element("p", "answer-label", "Код инструмента"));
+    source.append(pre);
+    reply.append(source);
   }
   reply.dataset.ok = String(ok);
-  reply.hidden = false;
+  assistant.dataset.complete = "true";
+  if (!work.contains(document.activeElement)) work.open = shouldOpenWork(turn);
+  assistant.hidden = reply.hidden = false;
   if (reply.isConnected) reply.classList.add("message-enter");
 
   const copy = element("button", "copy");
   copy.type = "button";
   const label = element("span", "", "Копировать");
   label.setAttribute("aria-live", "polite");
-  copy.append(lightIcon("copy"), label);
+  const copyIcon = lightIcon("content_copy");
+  copy.append(copyIcon, label);
   let copyTimer;
   copy.onclick = async () => {
     try {
       await navigator.clipboard.writeText(text);
       copy.dataset.copyState = "copied";
+      copyIcon.dataset.icon = "check";
       label.textContent = "Скопировано";
     } catch {
       copy.dataset.copyState = "error";
+      copyIcon.dataset.icon = "close";
       label.textContent = "Копирование недоступно";
     }
     clearTimeout(copyTimer);
     copyTimer = setTimeout(() => {
       delete copy.dataset.copyState;
+      copyIcon.dataset.icon = "content_copy";
       label.textContent = "Копировать";
     }, 1800);
   };
@@ -338,9 +436,21 @@ async function sendMessage(message) {
         turn.answer = { text: update.text, ok: update.ok };
         break;
       }
+      if (update.type === "thinking") {
+        const step = turn.steps.find((entry) => entry.id === update.id);
+        if (!step?.streams_text) continue;
+        step.thinkingText = (step.thinkingText ?? "") + update.delta;
+        if (active === chat) {
+          const row = views.get(turn.id).stepRows.get(step.id);
+          scrollWithUpdate(() => renderThinkingText(row, step));
+        }
+        continue;
+      }
       if (update.type !== "step") continue;
       const position = turn.steps.findIndex((step) => step.id === update.id);
-      measureThinking(update, turn.steps[position]);
+      const previous = turn.steps[position];
+      measureThinking(update, previous);
+      if (previous?.thinkingText) update.thinkingText = previous.thinkingText;
       if (position === -1) turn.steps.push(update);
       else turn.steps[position] = update;
       if (active === chat) scrollWithUpdate(() => renderStep(turn, update));
@@ -412,11 +522,13 @@ byId("new-chat").onclick = () => {
 byId("search").oninput = renderHistory;
 byId("sidebar-toggle").onclick = () => setSidebar(!byId("sidebar").classList.contains("open"));
 conversation.onclick = () => setSidebar(false);
-byId("example").onclick = () => {
-  question.value = byId("example").textContent;
-  syncComposer();
-  question.focus();
-};
+for (const example of document.querySelectorAll("[data-example]")) {
+  example.onclick = () => {
+    question.value = example.dataset.prompt ?? example.querySelector(".example-label").textContent;
+    syncComposer();
+    question.focus();
+  };
+}
 
 const library = byId("library");
 byId("open-library").onclick = async () => {

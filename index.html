@@ -4,17 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="evomind-space" content="https://abad3v-moonai-8b-qlora-qwen3.hf.space">
-  <meta name="theme-color" content="#202637">
+  <meta name="theme-color" content="#18202e">
   <title>EvoMind</title>
   <link rel="stylesheet" href="./styles.css">
   <script type="module" src="./app.js"></script>
 </head>
 <body>
   <aside class="sidebar" id="sidebar" aria-label="История чатов">
-    <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>EvoMind</span></div>
-    <button class="new-chat" id="new-chat" type="button"><span aria-hidden="true">＋</span> Новый чат</button>
+    <div class="brand"><span class="brand-icon" aria-hidden="true"><span class="brand-mark"></span></span><span>EvoMind</span></div>
+    <button class="new-chat" id="new-chat" type="button">
+      <span class="new-chat-icon" aria-hidden="true"><span class="icon" data-icon="add"></span></span> Новый чат
+    </button>
     <div class="history">
-      <label class="search"><span class="icon icon-search" aria-hidden="true"></span>
+      <label class="search"><span class="icon" data-icon="search" aria-hidden="true"></span>
         <input id="search" type="search" placeholder="Поиск по чатам" aria-label="Поиск по чатам">
       </label>
       <div class="history-title">История</div>
@@ -23,14 +25,18 @@
   </aside>
   <div class="workspace">
     <header class="topbar">
-      <button class="small-button sidebar-toggle" id="sidebar-toggle" type="button" aria-label="История чатов" aria-controls="sidebar" aria-expanded="false">☰</button>
-      <h1 id="chat-title">Новый чат</h1>
+      <button class="small-button icon-button sidebar-toggle" id="sidebar-toggle" type="button" aria-label="История чатов" aria-controls="sidebar" aria-expanded="false">
+        <span class="icon" data-icon="menu" aria-hidden="true"></span>
+      </button>
+      <div class="topbar-title"><span class="icon" data-icon="chat_bubble" aria-hidden="true"></span><h1 id="chat-title">Новый чат</h1></div>
       <div class="topbar-actions">
         <button class="small-button library-button" id="open-library" type="button">
-          <span class="icon icon-library" aria-hidden="true"></span> Инструменты
+          <span class="icon" data-icon="widgets" aria-hidden="true"></span> Инструменты
         </button>
         <details class="chat-menu" id="chat-menu">
-          <summary class="small-button" aria-label="Действия с чатом" title="Действия с чатом">···</summary>
+          <summary class="small-button icon-button" aria-label="Действия с чатом" title="Действия с чатом">
+            <span class="icon" data-icon="more_horiz" aria-hidden="true"></span>
+          </summary>
           <div class="menu-items">
             <button id="rename-chat" type="button">Переименовать чат</button>
             <button id="export-chat" type="button">Скачать историю</button>
@@ -42,22 +48,37 @@
       <div class="empty" id="empty">
         <span class="empty-icon" aria-hidden="true"><span class="brand-mark"></span></span>
         <h2>Спроси EvoMind</h2>
-        <button class="example" id="example" type="button">Найди НОД чисел F(10) и F(12)</button>
+        <div class="examples">
+          <button class="example" type="button" data-example>
+            <span class="example-icon" aria-hidden="true"><span class="icon" data-icon="timeline"></span></span>
+            <span class="example-label">Найди НОД чисел F(10) и F(12)</span>
+          </button>
+          <button class="example" type="button" data-example data-prompt="Создай и сохрани инструмент для расчёта периметра прямоугольника. Примени его к прямоугольнику со сторонами 7 и 5.">
+            <span class="example-icon" aria-hidden="true"><span class="icon" data-icon="widgets"></span></span>
+            <span class="example-label">Инструмент для периметра</span>
+          </button>
+        </div>
       </div>
       <div class="thread" id="thread"></div>
     </main>
     <div class="composer-wrap">
-      <button class="jump-latest" id="jump-latest" type="button" aria-label="К последнему сообщению" title="К последнему сообщению" hidden>↓</button>
+      <button class="jump-latest" id="jump-latest" type="button" aria-label="К последнему сообщению" title="К последнему сообщению" hidden>
+        <span class="icon" data-icon="arrow_downward" aria-hidden="true"></span>
+      </button>
       <form class="composer" id="composer">
         <textarea id="question" rows="1" maxlength="6000" placeholder="Спроси EvoMind…" aria-label="Сообщение" required></textarea>
-        <button id="send" type="submit" title="Отправить · Enter" aria-label="Отправить" disabled><span aria-hidden="true">→</span></button>
+        <button id="send" type="submit" title="Отправить · Enter" aria-label="Отправить" disabled>
+          <span class="icon" data-icon="arrow_forward" aria-hidden="true"></span>
+        </button>
       </form>
       <p class="composer-status" id="composer-status" role="status"></p>
     </div>
   </div>
   <dialog id="library" class="panel" aria-labelledby="library-title">
     <div class="panel-header"><h2 id="library-title">Инструменты</h2>
-      <form method="dialog"><button class="small-button" aria-label="Закрыть">×</button></form>
+      <form method="dialog">
+        <button class="small-button icon-button" aria-label="Закрыть"><span class="icon" data-icon="close" aria-hidden="true"></span></button>
+      </form>
     </div>
     <div id="library-content" class="panel-content" aria-live="polite"></div>
   </dialog>
