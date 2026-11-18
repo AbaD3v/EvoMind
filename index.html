@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="evomind-space" content="https://abad3v-moonai-8b-qlora-qwen3.hf.space">
+  <meta name="theme-color" content="#202637">
+  <title>EvoMind</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <aside class="sidebar" id="sidebar" aria-label="История чатов">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>EvoMind</span></div>
+    <button class="new-chat" id="new-chat" type="button"><span aria-hidden="true">＋</span> Новый чат</button>
+    <div class="history">
+      <label class="search"><span class="icon icon-search" aria-hidden="true"></span>
+        <input id="search" type="search" placeholder="Поиск по чатам" aria-label="Поиск по чатам">
+      </label>
+      <div class="history-title">История</div>
+      <nav id="history" aria-label="Сохранённые чаты"></nav>
+    </div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar">
+      <button class="small-button sidebar-toggle" id="sidebar-toggle" type="button" aria-label="История чатов" aria-controls="sidebar" aria-expanded="false">☰</button>
+      <h1 id="chat-title">Новый чат</h1>
+      <div class="topbar-actions">
+        <button class="small-button library-button" id="open-library" type="button">
+          <span class="icon icon-library" aria-hidden="true"></span> Инструменты
+        </button>
+        <details class="chat-menu" id="chat-menu">
+          <summary class="small-button" aria-label="Действия с чатом" title="Действия с чатом">···</summary>
+          <div class="menu-items">
+            <button id="rename-chat" type="button">Переименовать чат</button>
+            <button id="export-chat" type="button">Скачать историю</button>
+          </div>
+        </details>
+      </div>
+    </header>
+    <main class="conversation" id="conversation" aria-labelledby="chat-title">
+      <div class="empty" id="empty">
+        <span class="empty-icon" aria-hidden="true"><span class="brand-mark"></span></span>
+        <h2>Спроси EvoMind</h2>
+        <button class="example" id="example" type="button">Найди НОД чисел F(10) и F(12)</button>
+      </div>
+      <div class="thread" id="thread"></div>
+    </main>
+    <div class="composer-wrap">
+      <button class="jump-latest" id="jump-latest" type="button" aria-label="К последнему сообщению" title="К последнему сообщению" hidden>↓</button>
+      <form class="composer" id="composer">
+        <textarea id="question" rows="1" maxlength="6000" placeholder="Спроси EvoMind…" aria-label="Сообщение" required></textarea>
+        <button id="send" type="submit" title="Отправить · Enter" aria-label="Отправить" disabled><span aria-hidden="true">→</span></button>
+      </form>
+      <p class="composer-status" id="composer-status" role="status"></p>
+    </div>
+  </div>
+  <dialog id="library" class="panel" aria-labelledby="library-title">
+    <div class="panel-header"><h2 id="library-title">Инструменты</h2>
+      <form method="dialog"><button class="small-button" aria-label="Закрыть">×</button></form>
+    </div>
+    <div id="library-content" class="panel-content" aria-live="polite"></div>
+  </dialog>
+  <dialog id="rename-dialog" class="rename-dialog" aria-labelledby="rename-title">
+    <form method="dialog">
+      <h2 id="rename-title">Название чата</h2>
+      <input id="rename-value" aria-label="Название чата" maxlength="70" required>
+      <div class="dialog-actions">
+        <button class="small-button" value="cancel" formnovalidate>Отмена</button>
+        <button class="small-button primary" value="save">Сохранить</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>
