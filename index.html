@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="evomind-space" content="https://abad3v-moonai-8b-qlora-qwen3.hf.space">
+  <meta name="evomind-oauth-client-id" content="">
+  <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#18202e">
   <title>EvoMind</title>
   <link rel="stylesheet" href="./styles.css">
@@ -30,6 +32,9 @@
       </button>
       <div class="topbar-title"><span class="icon" data-icon="chat_bubble" aria-hidden="true"></span><h1 id="chat-title">Новый чат</h1></div>
       <div class="topbar-actions">
+        <button class="small-button account-button" id="hf-account" type="button" disabled>
+          <span class="account-icon" aria-hidden="true"></span><span id="hf-account-label">Войти через HF</span>
+        </button>
         <button class="small-button library-button" id="open-library" type="button">
           <span class="icon" data-icon="widgets" aria-hidden="true"></span> Инструменты
         </button>
@@ -71,9 +76,19 @@
           <span class="icon" data-icon="arrow_forward" aria-hidden="true"></span>
         </button>
       </form>
-      <p class="composer-status" id="composer-status" role="status"></p>
     </div>
   </div>
+  <dialog id="hf-account-dialog" class="panel account-panel" aria-labelledby="hf-account-title">
+    <div class="panel-header"><h2 id="hf-account-title">Аккаунт Hugging Face</h2>
+      <form method="dialog">
+        <button class="small-button icon-button" aria-label="Закрыть"><span class="icon" data-icon="close" aria-hidden="true"></span></button>
+      </form>
+    </div>
+    <div class="panel-content">
+      <p id="hf-account-status"></p>
+      <button class="small-button" id="hf-logout" type="button" hidden>Выйти из EvoMind</button>
+    </div>
+  </dialog>
   <dialog id="library" class="panel" aria-labelledby="library-title">
     <div class="panel-header"><h2 id="library-title">Инструменты</h2>
       <form method="dialog">

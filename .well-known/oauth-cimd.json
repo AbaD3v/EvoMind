@@ -1,0 +1,7 @@
+{
+  "client_id": "https://evomind-two.vercel.app/.well-known/oauth-cimd.json",
+  "client_name": "EvoMind",
+  "client_uri": "https://evomind-two.vercel.app/",
+  "redirect_uris": ["https://evomind-two.vercel.app/"],
+  "token_endpoint_auth_method": "none"
+}
