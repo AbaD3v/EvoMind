@@ -377,25 +377,9 @@ function webLink(item, className, label) {
   }
 }
 
-function requestedPreviewAccent(question) {
-  const palette = { красн: "red", син: "blue", голуб: "blue", зелен: "green", зелён: "green",
-    фиолетов: "purple", нейтральн: "neutral", red: "red", blue: "blue", green: "green",
-    purple: "purple", neutral: "neutral" };
-  const colors = new Set();
-  const request = question.toLowerCase().replace(/[*_]/g, "");
-  const pattern = /(?:^|[^\p{L}])(?:(не|not)\s+)?(?:с|в|with|in)\s+(?:a\s+)?(красн|син|голуб|зел[её]н|фиолетов|нейтральн|red|blue|green|purple|neutral)[\p{L}]*\s+(?:рамк[\p{L}]*|обводк[\p{L}]*|border|frame)(?!\p{L})/gu;
-  for (const [, excluded, color] of request.matchAll(pattern)) {
-    if (!excluded) colors.add(palette[color]);
-  }
-  return colors.size === 1 ? colors.values().next().value : null;
-}
-
-function renderWebResult(result, question) {
-  if (!result) return null;
-  const requestedAccent = requestedPreviewAccent(question);
+function renderWebResult(result) {
   if (result?.type === "web_search" && Array.isArray(result.results)) {
     const sources = element("ul", "web-sources");
-    if (requestedAccent) sources.dataset.accent = requestedAccent;
     for (const item of result.results.slice(0, 6)) {
       const link = webLink(item, "web-source-title", item?.title);
       if (!link) continue;
@@ -406,13 +390,15 @@ function renderWebResult(result, question) {
     }
     return sources.childElementCount ? sources : null;
   }
-  if (result?.type !== "site_preview" && result?.type !== "web_page") return null;
+  const isPreview = result?.type === "site_preview";
+  if (!isPreview && result?.type !== "web_page") return null;
   const link = webLink(result, "small-button preview-link", "Открыть сайт");
   if (!link) return null;
-  const preview = element("article", "site-preview");
-  preview.dataset.layout = result.layout === "compact" ? "compact" : "wide";
-  const accent = requestedAccent ?? result.accent;
-  preview.dataset.accent = ["blue", "green", "red", "purple"].includes(accent) ? accent : "neutral";
+  const preview = element("article", isPreview ? "site-preview" : "web-page");
+  if (isPreview) {
+    preview.dataset.layout = result.layout === "compact" ? "compact" : "wide";
+    preview.dataset.accent = ["blue", "green", "red", "purple"].includes(result.accent) ? result.accent : "neutral";
+  }
   preview.append(element("p", "web-domain", new URL(link.href).hostname), element("h3", "", result.title));
   if (result.description && result.show_description !== false) {
     preview.append(element("p", "web-description", result.description));
@@ -436,7 +422,7 @@ function renderAnswer(turn) {
   const answerBody = presentation ? renderPresentation(presentation)
     : result ? renderResult(result) : element("div", "", body);
   reply.replaceChildren(answerBody);
-  const webView = renderWebResult(webResult, turn.question);
+  const webView = renderWebResult(webResult);
   if (webView && webResult.type === "web_search") {
     const note = answerBody.querySelector(".answer-tool-note");
     reply.append(webView);
