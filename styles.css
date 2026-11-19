@@ -172,16 +172,16 @@ summary::-webkit-details-marker { display: none; }
 .answer-explanation { color: #e4edf9; }
 .answer-tool-note { color: #bccae0; font-size: .88rem; }
 .web-sources { display: grid; gap: 8px; margin: 10px 0; padding: 0; list-style: none; }
-.web-source, .site-preview { min-width: 0; padding: 12px 14px; border: 1px solid #a8c9fb38; border-radius: 11px; background: #1723379c; }
-.web-source-title, .preview-link { color: var(--blue); }
+.web-source, .site-preview { min-width: 0; padding: 12px 14px; border: 1px solid var(--web-outline, #b5becc36); border-radius: 11px; background: #1723379c; }
+.web-source-title, .preview-link { color: var(--web-accent, var(--blue)); }
 .web-domain { color: var(--muted); font-size: .74rem; margin-bottom: 3px; }
 .web-description { color: #e2ebfa; font-size: .87rem; }
 .site-preview { display: grid; justify-items: start; gap: 7px; margin: 0 0 8px; }
 .site-preview[data-layout="compact"] { max-width: 380px; }
-.site-preview[data-accent="blue"] { border-color: #82b8ff9c; }
-.site-preview[data-accent="green"] { border-color: #90e0b698; }
-.site-preview[data-accent="red"] { border-color: #ffadb28a; }
-.site-preview[data-accent="purple"] { border-color: #c1a4ff9c; }
+:is(.site-preview, .web-sources)[data-accent="blue"] { --web-accent: #a4caff; --web-outline: #82b8ffb5; }
+:is(.site-preview, .web-sources)[data-accent="green"] { --web-accent: #a4ecc6; --web-outline: #90e0b6b5; }
+:is(.site-preview, .web-sources)[data-accent="red"] { --web-accent: #ffbbb5; --web-outline: #ff8f86; }
+:is(.site-preview, .web-sources)[data-accent="purple"] { --web-accent: #d9c5ff; --web-outline: #c1a4ffb5; }
 .site-preview .web-domain { margin: 0; }
 .site-preview h3 { margin: 0; font-size: 1.04rem; font-weight: 640; }
 .web-excerpt { max-height: 150px; overflow: auto; color: #c9d6e9; font-size: .83rem; }
