@@ -1,5 +1,6 @@
 import { completeHfLogin, readHfSession, signOutFromHf, startHfLogin } from "./hf-auth.mjs";
 import { renderHtmlCard } from "./card-preview.mjs";
+import { readQuotaError, streamSpaceEvents } from "./space-events.mjs";
 
 const CLIENT_MODULE = "https://cdn.jsdelivr.net/npm/@gradio/client@2.8.0/dist/index.min.js";
 const SPACE = document.querySelector('meta[name="evomind-space"]').content;
@@ -599,11 +600,11 @@ function clearHfSession() {
 }
 
 function quotaAnswer(message, authenticated) {
-  if (!/\bquota\b|квот/i.test(message)) return null;
-  const match = message.match(/(\d+(?:\.\d+)?)\s*s\s+requested\s+vs\.?\s*(\d+(?:\.\d+)?)\s*s\s+left/i);
+  const quota = readQuotaError(message);
+  if (!quota) return null;
   const limit = authenticated ? "доступном лимите" : "гостевом лимите";
-  const text = match
-    ? `Для запроса нужно ${seconds.format(Number(match[1]))} с GPU, а в ${limit} осталось ${seconds.format(Number(match[2]))} с.`
+  const text = quota.requested !== undefined
+    ? `Для запроса нужно ${seconds.format(quota.requested)} с GPU, а в ${limit} осталось ${seconds.format(quota.remaining)} с.`
     : `ZeroGPU отклонил запрос по ${authenticated ? "лимиту GPU" : "гостевому лимиту"}.`;
   return { text, ok: false, guestQuota: !authenticated };
 }
@@ -637,12 +638,16 @@ async function sendMessage(message) {
     if (!client.config.dependencies.some((endpoint) => endpoint.api_name === "respond_events")) {
       throw new Error("В Space нет потока событий. Нужно обновить его версию.");
     }
-    const job = client.submit("/respond_events", { message });
+    let retryLabel;
+    const job = streamSpaceEvents(client, message, (budget) => {
+      retryLabel = `Повторяю с бюджетом ${seconds.format(budget)} с GPU…`;
+      setTurnProgress(turn, "waiting", retryLabel);
+    });
     for await (const event of job) {
       if (event.type === "status") {
-        if (event.stage === "error") throw new Error(event.message || "Space завершил запрос с ошибкой.");
         if (event.stage === "pending" && !turn.steps.length) {
-          setTurnProgress(turn, "waiting", event.position > 0 ? `В очереди · ${event.position + 1}` : undefined);
+          const queueLabel = event.position > 0 ? `В очереди · ${event.position + 1}` : undefined;
+          setTurnProgress(turn, "waiting", retryLabel ?? queueLabel);
         }
         if (event.stage === "generating" && !turn.steps.length) {
           setTurnProgress(turn, "thinking");
