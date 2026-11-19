@@ -26,11 +26,12 @@ export async function* streamSpaceEvents(client, message, onRetry) {
     } catch (error) {
       if (started || !canReduceBudget || attempt >= 2) throw error;
       const quota = readQuotaError(error?.message || String(error));
-      if (!quota || !(quota.remaining > 0 && quota.remaining < quota.requested)) throw error;
+      if (!quota || !(quota.remaining > 0 && quota.remaining <= quota.requested)) throw error;
 
-      // A larger GPU allocation can cost more quota seconds than its requested runtime.
-      const cost = budget === undefined ? 1 : Math.max(1, quota.requested / budget);
-      const smaller = Math.floor(quota.remaining / cost);
+      // The scheduler reports rounded quota seconds. Leave room for rounding after a denied retry.
+      const smaller = budget === undefined
+        ? Math.min(Math.floor(quota.remaining), Math.ceil(quota.requested) - 1)
+        : Math.floor((quota.remaining - 1) / Math.max(1, quota.requested / budget));
       if (smaller < 1 || (budget !== undefined && smaller >= budget)) throw error;
       budget = smaller;
       onRetry(budget);
