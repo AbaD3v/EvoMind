@@ -1,4 +1,5 @@
 import { completeHfLogin, readHfSession, signOutFromHf, startHfLogin } from "./hf-auth.mjs";
+import { renderHtmlCard } from "./card-preview.mjs";
 
 const CLIENT_MODULE = "https://cdn.jsdelivr.net/npm/@gradio/client@2.8.0/dist/index.min.js";
 const SPACE = document.querySelector('meta[name="evomind-space"]').content;
@@ -389,6 +390,10 @@ function renderWebResult(result) {
       sources.append(source);
     }
     return sources.childElementCount ? sources : null;
+  }
+  if (result?.type === "html_card") {
+    const link = webLink(result, "small-button preview-link", "Открыть источник");
+    return link ? renderHtmlCard(result, link) : null;
   }
   const isPreview = result?.type === "site_preview";
   if (!isPreview && result?.type !== "web_page") return null;

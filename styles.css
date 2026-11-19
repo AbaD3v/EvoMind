@@ -186,6 +186,8 @@ summary::-webkit-details-marker { display: none; }
 :is(.site-preview, .web-page) h3 { margin: 0; font-size: 1.04rem; font-weight: 640; }
 .web-excerpt { max-height: 150px; overflow: auto; color: #c9d6e9; font-size: .83rem; }
 .preview-link { margin-top: 3px; text-decoration: none; }
+.html-card { display: grid; justify-items: start; gap: 9px; margin-bottom: 8px; }
+.html-card-frame { display: block; width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: #1b283b; }
 .answer-readout { display: grid; gap: 12px; margin: 0; }
 .answer-readout dd { min-width: 0; margin: 0; }
 .answer-label { color: var(--muted); font-size: .77rem; font-weight: 600; }
