@@ -6,9 +6,12 @@
   <meta name="evomind-space" content="https://abad3v-moonai-8b-qlora-qwen3.hf.space">
   <meta name="evomind-oauth-client-id" content="">
   <meta name="referrer" content="no-referrer">
-  <meta name="theme-color" content="#151a23">
+  <meta name="theme-color" content="#101213">
   <meta name="description" content="EvoMind — AI-помощник для вопросов, задач и инструментов. Ответы с понятным ходом работы.">
   <title>EvoMind</title>
+  <link rel="preload" href="./assets/inter-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="./assets/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="./assets/inter.css">
   <link rel="stylesheet" href="./styles.css">
   <script type="module" src="./app.js"></script>
 </head>
@@ -28,7 +31,6 @@
     <button class="new-chat" id="new-chat" type="button">
       <span class="new-chat-icon" aria-hidden="true"><span class="icon" data-icon="add"></span></span>
       Новый чат
-      <span class="new-chat-arrow" aria-hidden="true">↗</span>
     </button>
     <div class="history">
       <label class="search"><span class="icon" data-icon="search" aria-hidden="true"></span>

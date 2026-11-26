@@ -233,7 +233,7 @@ function makeTurn(turn) {
   const heading = element("summary");
   const count = element("span", "work-count");
   count.title = "Количество шагов";
-  heading.append(lightIcon("timeline"), element("span", "work-title", "Ход решения"), count, lightIcon("chevron_right"));
+  heading.append(lightIcon("chevron_right"), element("span", "work-title", "Ход решения"), count);
   const steps = element("div", "steps");
   work.append(heading, steps);
   work.open = shouldOpenWork(turn);

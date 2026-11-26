@@ -194,6 +194,8 @@ function renderTable(lines, start, spec) {
 function renderList(lines, start, depth) {
   const first = listItem(lines[start]);
   const list = node(first.ordered ? "ol" : "ul");
+  // Preserve list semantics in browsers that hide them with custom CSS markers.
+  list.setAttribute("role", "list");
   if (first.ordered && first.start !== 1) list.start = first.start;
   let end = start;
   while (end < lines.length) {
