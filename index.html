@@ -13,6 +13,7 @@
   <link rel="preload" href="./assets/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="./assets/inter.css">
   <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./results-workspace.css">
   <script type="module" src="./app.js"></script>
 </head>
 <body>
@@ -84,6 +85,11 @@
           <p class="welcome-description">От первого вопроса до готового решения.<br>С объяснением, вычислениями и нужными инструментами.</p>
         </div>
         <div class="examples" aria-label="Примеры запросов">
+          <button class="example" id="result-demo" type="button" data-result-demo>
+            <span class="example-icon" aria-hidden="true"><span class="icon" data-icon="timeline"></span></span>
+            <span class="example-copy"><span class="example-label">Таблица → график</span><span class="example-description">Попробуй рабочую область на учебных данных</span></span>
+            <span class="example-arrow" aria-hidden="true">↗</span>
+          </button>
           <button class="example" type="button" data-example data-prompt="Найди НОД чисел F(10) и F(12). Объясни ход решения.">
             <span class="example-icon" aria-hidden="true"><span class="icon" data-icon="timeline"></span></span>
             <span class="example-copy"><span class="example-label">Разобрать задачу</span><span class="example-description">Числа Фибоначчи и общий делитель</span></span>
@@ -117,6 +123,41 @@
       <div class="composer-hint" id="composer-hint"><span>Ответы AI стоит проверять</span><span class="keyboard-hint"><kbd>Enter</kbd> отправить · <kbd>Shift + Enter</kbd> новая строка</span></div>
     </div>
   </div>
+  <dialog id="results-panel" class="results-panel" aria-labelledby="results-title" aria-describedby="results-source">
+    <header class="results-header">
+      <div><p class="panel-eyebrow">РАБОЧАЯ ОБЛАСТЬ</p><h2 id="results-title">Результат</h2></div>
+      <button id="results-close" class="small-button icon-button" type="button" aria-label="Закрыть рабочую область" autofocus><span class="icon" data-icon="close" aria-hidden="true"></span></button>
+    </header>
+    <p id="results-source" class="results-source"></p>
+    <div class="results-toolbar">
+      <div class="results-tabs" role="tablist" aria-label="Вид результата">
+        <button id="results-tab-table" class="results-tab" role="tab" type="button" aria-selected="true" aria-controls="results-table-view">Таблица</button>
+        <button id="results-tab-chart" class="results-tab" role="tab" type="button" aria-selected="false" aria-controls="results-chart-view" tabindex="-1">График</button>
+      </div>
+      <button id="results-download" class="small-button" type="button"><span class="icon" data-icon="arrow_downward" aria-hidden="true"></span>Скачать CSV</button>
+    </div>
+    <p id="results-meta" class="results-meta"></p>
+    <div class="results-body">
+      <section id="results-table-view" class="results-view" role="tabpanel" aria-labelledby="results-tab-table">
+        <div id="results-table-scroll" class="results-table-scroll" tabindex="0" role="region" aria-label="Таблица результата, доступна прокрутка"></div>
+        <p id="results-table-note" class="results-note" hidden></p>
+      </section>
+      <section id="results-chart-view" class="results-view" role="tabpanel" aria-labelledby="results-tab-chart" hidden>
+        <div id="results-controls" class="results-controls">
+          <label>Подписи<select id="results-label"></select></label>
+          <label>Значения<select id="results-value"></select></label>
+          <label>Вид графика<select id="results-kind"><option value="bar">Столбцы</option><option value="line">Линия</option></select></label>
+        </div>
+        <p id="results-chart-caption" class="results-chart-caption"></p>
+        <div id="results-chart"></div>
+        <div id="results-chart-empty" class="results-empty" hidden><strong>Для графика нужны числа</strong><p>Эту таблицу можно просмотреть и скачать. Для графика добавь числовой столбец с одной единицей измерения.</p></div>
+        <p id="results-chart-note" class="results-note"></p>
+        <details id="results-chart-help" class="results-help"><summary>Как читаются данные</summary><p>Точка и запятая считаются десятичным разделителем, пробел — разделителем тысяч. Проценты показываются в процентах. Строки без числа или выбранной подписи пропускаются; числа и проценты в одном столбце не смешиваются. Порядок строк сохраняется.</p></details>
+      </section>
+    </div>
+    <p id="results-status" class="results-status" role="status"></p>
+    <footer class="results-footer"><span id="results-origin">Данные из ответа EvoMind</span><button id="results-source-link" class="copy" type="button">К ответу ↗</button></footer>
+  </dialog>
   <dialog id="hf-account-dialog" class="panel account-panel" aria-labelledby="hf-account-title">
     <div class="panel-header"><h2 id="hf-account-title">Аккаунт Hugging Face</h2>
       <form method="dialog">

@@ -4,6 +4,7 @@ import { streamSpaceEvents } from "./space-events.mjs";
 import { classifyRequestError } from "./request-errors.mjs";
 import { renderMarkdown, renderCodeBlock } from "./answer-content.mjs";
 import { createToolLibrary } from "./tool-library.mjs";
+import { createResultsWorkspace } from "./results-workspace.mjs";
 
 const CLIENT_MODULE = "https://cdn.jsdelivr.net/npm/@gradio/client@2.8.0/dist/index.min.js";
 const SPACE = document.querySelector('meta[name="evomind-space"]').content;
@@ -33,6 +34,7 @@ const hfLogout = byId("hf-logout");
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const seconds = new Intl.NumberFormat("ru", { maximumFractionDigits: 1 });
 const views = new Map();
+const resultsWorkspace = createResultsWorkspace();
 const stop = element("button", "stop-generation", "Стоп");
 stop.id = "stop-generation";
 stop.type = "button";
@@ -497,6 +499,7 @@ function renderAnswer(turn) {
     reply.append(links);
   }
   reply.dataset.ok = String(ok);
+  if (ok) resultsWorkspace.enhance(reply, turn.question);
   reply.dataset.cancelled = String(Boolean(cancelled));
   assistant.dataset.complete = "true";
   if (!work.contains(document.activeElement)) work.open = shouldOpenWork(turn);
@@ -591,6 +594,7 @@ function setSidebar(open) {
 }
 
 function selectChat(chat) {
+  resultsWorkspace.close({ restoreFocus: false });
   active = chat;
   views.clear();
   thread.replaceChildren(...chat.turns.map(makeTurn));

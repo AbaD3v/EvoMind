@@ -5,6 +5,7 @@ import { chromium } from 'playwright-core';
 import { serve } from '../scripts/serve.mjs';
 import { runRendererChecks } from './answer-content.browser.mjs';
 import { runRecoveryChecks } from './recovery.browser.mjs';
+import { runResultsChecks } from './results.browser.mjs';
 
 // Fixtures replace only the Gradio transport. The production DOM, modules,
 // event handling, storage and CSS run unchanged in an isolated browser.
@@ -176,8 +177,9 @@ try {
   await runRendererChecks(rendererPage, assert);
   await rendererPage.close();
   await runRecoveryChecks(browser, base, assert);
+  await runResultsChecks(browser, base, assert);
   assert.deepEqual(errors, [], 'no browser errors');
-  console.log('Browser checks passed: responsive layouts, history, rich answers, safe markup, retry, cancellation, offline draft, tools, keyboard focus.');
+  console.log('Browser checks passed: responsive layouts, history, rich answers, safe markup, retry, cancellation, offline draft, tools, keyboard focus, result tables/charts/CSV.');
 } catch (error) {
   console.error('Browser errors:', errors);
   console.error('Library state:', await page.locator('#library').innerText());
