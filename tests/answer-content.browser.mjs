@@ -90,6 +90,63 @@ export async function runRendererChecks(page, assert) {
   assert.equal(result.unclosedFence, "const x = 1;");
   assert.equal(result.invalidLanguage, "Код");
 
+  const syntax = await page.evaluate(async () => {
+    const { renderCodeBlock } = await import("/answer-content.mjs");
+    const pythonSource = [
+      "def solve(value=42):",
+      '    # return fake(9) <img src=x onerror="alert(1)">',
+      '    text = "return fake(13) <script>alert(1)</script>"',
+      String.raw`    name = "a \"quoted\" value"`,
+      '    template = f"call({value})"',
+      "    doc = '''return fake(88)",
+      "# still inside the string'''",
+      "\tprint(text)",
+      "    return value + 0.5",
+      "",
+    ].join("\r\n");
+    const jsonSource = '{"answer":42,"active":true,"note":"return fake(1) <script>alert(1)</script>"}\n';
+    const inspect = (source, language) => {
+      const block = renderCodeBlock(source, language);
+      const code = block.querySelector(".code-content code");
+      return {
+        exact: code.textContent === source,
+        keywords: [...code.querySelectorAll(".syntax-keyword")].map((part) => part.textContent),
+        functions: [...code.querySelectorAll(".syntax-function")].map((part) => part.textContent),
+        numbers: [...code.querySelectorAll(".syntax-number")].map((part) => part.textContent),
+        strings: [...code.querySelectorAll(".syntax-string")].map((part) => part.textContent),
+        comments: [...code.querySelectorAll(".syntax-comment")].map((part) => part.textContent),
+        nested: code.querySelectorAll(".syntax-string span, .syntax-comment span").length,
+        activeMarkup: code.querySelectorAll("script, img, iframe, svg, [onerror]").length,
+        spans: code.querySelectorAll("span").length,
+      };
+    };
+    return {
+      python: inspect(pythonSource, "Python"),
+      json: inspect(jsonSource, "json"),
+      unknown: inspect(pythonSource, "unknown"),
+      oversized: inspect("# " + "x".repeat(24_001), "python"),
+      dense: inspect("1 ".repeat(1501), "python"),
+    };
+  });
+  assert.ok(Object.values(syntax).every((item) => item.exact), 'syntax coloring preserves every source character');
+  assert.deepEqual(syntax.python.keywords, ["def", "return"]);
+  assert.deepEqual(syntax.python.functions, ["solve", "print"]);
+  assert.deepEqual(syntax.python.numbers, ["42", "0.5"]);
+  assert.equal(syntax.python.strings.length, 4);
+  assert.ok(syntax.python.strings[1].includes('\\"quoted\\"'));
+  assert.ok(syntax.python.strings[2].startsWith('f"'));
+  assert.ok(syntax.python.strings[3].includes("# still inside the string"));
+  assert.equal(syntax.python.comments.length, 1);
+  assert.equal(syntax.python.nested, 0, 'strings and comments stay atomic');
+  assert.equal(syntax.python.activeMarkup, 0);
+  assert.deepEqual(syntax.json.keywords, ["true"]);
+  assert.deepEqual(syntax.json.numbers, ["42"]);
+  assert.equal(syntax.json.strings.length, 4);
+  assert.equal(syntax.json.activeMarkup, 0);
+  assert.equal(syntax.unknown.spans, 0, 'unknown languages remain plain');
+  assert.equal(syntax.oversized.spans, 0, 'large snippets skip coloring');
+  assert.equal(syntax.dense.spans, 0, 'token-dense snippets cannot create unbounded DOM');
+
   // Exercise real browser click handling and both Clipboard API outcomes.
   await page.evaluate(async () => {
     const { renderCodeBlock } = await import("/answer-content.mjs");
@@ -101,12 +158,12 @@ export async function runRendererChecks(page, assert) {
     });
     const host = document.createElement("div");
     host.id = "renderer-copy-fixture";
-    host.append(renderCodeBlock("print(42)", "python"));
+    host.append(renderCodeBlock("def solve():\r\n\treturn 42\r\n", "python"));
     document.body.append(host);
   });
   const copy = page.locator("#renderer-copy-fixture .code-copy");
   await copy.click();
-  assert.equal(await page.evaluate(() => window.rendererCopied), "print(42)");
+  assert.equal(await page.evaluate(() => window.rendererCopied), "def solve():\r\n\treturn 42\r\n");
   assert.equal(await copy.getAttribute("data-copy-state"), "copied");
   assert.equal(await copy.textContent(), "Скопировано");
   await page.evaluate(() => {
