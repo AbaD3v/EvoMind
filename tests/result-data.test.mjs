@@ -47,14 +47,24 @@ test("chart series preserves raw labels and row indices, skips missing labels/va
   };
   assert.deepEqual(chartSeries(table, 0, 1), {
     points: [
-      { label: " Январь ", value: 1200.5, rowIndex: 0 },
-      { label: "Май", value: 0, rowIndex: 4 },
-      { label: "Июнь", value: -5, rowIndex: 5 },
+      { label: " Январь ", value: 1200.5, rawValue: "1 200,5", rowIndex: 0 },
+      { label: "Май", value: 0, rawValue: "0", rowIndex: 4 },
+      { label: "Июнь", value: -5, rawValue: "-5", rowIndex: 5 },
     ], skipped: 3, unit: "",
   });
   assert.deepEqual(chartSeries({ headers: ["Доля"], rows: [["12,5%"], [""], ["100%"]] }, -1, 0), {
-    points: [{ label: "1", value: 12.5, rowIndex: 0 }, { label: "3", value: 100, rowIndex: 2 }], skipped: 1, unit: "%",
+    points: [{ label: "1", value: 12.5, rawValue: "12,5%", rowIndex: 0 }, { label: "3", value: 100, rawValue: "100%", rowIndex: 2 }], skipped: 1, unit: "%",
   });
+});
+
+test("chart points retain exact source precision and formatting for readouts", () => {
+  const raw = ["9007199254740993", "0,123456789012345678901", " 1\u00a0234,500 "];
+  const series = chartSeries({ headers: ["Значение"], rows: raw.map((value) => [value]) }, -1, 0);
+  assert.equal(series.skipped, 0);
+  assert.deepEqual(series.points.map((point) => point.rawValue), raw);
+  assert.equal(series.points[0].value, 9007199254740992, "geometry uses the available Number precision");
+  assert.notEqual(String(series.points[0].value), series.points[0].rawValue, "exact readouts must use rawValue");
+  assert.equal(series.points[2].value, 1234.5);
 });
 
 test("empty or nonnumeric tables and invalid selectors produce no invented points", () => {

@@ -65,7 +65,7 @@ export function renderResultChart({ points = [], unit = "", kind = "bar", labelT
   if (values.length > 8) svg.style.minWidth = `${width}px`;
   svg.append(svgNode("title", { id: `${id}-title` }, title));
   svg.append(svgNode("desc", { id: `${id}-description` }, `Число значений: ${values.length}. Категории расположены в порядке строк таблицы на равном расстоянии. Ось значений включает ноль. Выберите элемент диаграммы, чтобы прочитать точное значение.`));
-  const axisTitle = svgNode("text", { x: left, y: 18, class: "chart-axis-label", fill: "#aebbb6", "font-size": 12 }, shortLabel(valueTitle, 48));
+  const axisTitle = svgNode("text", { x: left, y: 18, class: "chart-axis-label", fill: "#aebbb6", "font-size": 12 }, shortLabel(valueTitle, Math.min(48, Math.floor(plotWidth / 7))));
   axisTitle.append(svgNode("title", {}, valueTitle));
   svg.append(axisTitle);
 
@@ -95,7 +95,9 @@ export function renderResultChart({ points = [], unit = "", kind = "bar", labelT
   const marks = [];
   values.forEach((point, index) => {
     const label = String(point.label ?? index + 1);
-    const readableValue = formatValue(point.value, unit);
+    // Geometry uses finite numbers; the readout preserves the source cell even
+    // when its decimal precision exceeds JavaScript's numeric representation.
+    const readableValue = typeof point.rawValue === "string" ? point.rawValue.trim() : formatValue(point.value, unit);
     const accessibleLabel = `${label}: ${readableValue}`;
     const valueY = y(normalized[index]);
     const barWidth = Math.min(48, plotWidth / values.length * 0.6);
@@ -122,7 +124,7 @@ export function renderResultChart({ points = [], unit = "", kind = "bar", labelT
       if (event.key === "Enter" || event.key === " ") { event.preventDefault(); select(); }
     });
     svg.append(mark);
-    const labelLength = Math.max(4, Math.min(16, Math.floor(plotWidth / values.length / 7)));
+    const labelLength = Math.max(2, Math.min(16, Math.floor(plotWidth / values.length / 7)));
     const category = svgNode("text", { x: x(index), y: height - bottom + 26, "text-anchor": "middle", class: "chart-axis-label", fill: "#aebbb6", "font-size": 12 }, shortLabel(label.replace(/\s+/gu, " "), labelLength));
     category.append(svgNode("title", {}, label));
     svg.append(category);

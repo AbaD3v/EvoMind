@@ -56,7 +56,7 @@ export function chartSeries(table, labelIndex, valueIndex) {
   rows.forEach((row, rowIndex) => {
     const parsed = column.values[rowIndex];
     const label = labelIndex === -1 ? String(rowIndex + 1) : cell(row, labelIndex);
-    if (parsed && label.trim()) points.push({ label, value: parsed.value, rowIndex });
+    if (parsed && label.trim()) points.push({ label, value: parsed.value, rawValue: cell(row, valueIndex), rowIndex });
   });
   return { points, skipped: rows.length - points.length, unit: column.unit };
 }
