@@ -1,3 +1,5 @@
+import { highlightCode } from "./syntax-highlight.mjs";
+
 // A deliberately small Markdown renderer. Model output is always text, never HTML.
 // Unsupported constructs stay readable instead of executing embedded markup.
 const MAX_NESTING = 8;
@@ -123,7 +125,9 @@ export function renderCodeBlock(code, language = "") {
   const pre = node("pre", "code-content");
   pre.tabIndex = 0;
   pre.setAttribute("aria-label", label === "Код" ? "Блок кода" : `Код: ${label}`);
-  pre.append(node("code", "", source));
+  const content = node("code");
+  content.append(highlightCode(source, label));
+  pre.append(content);
   block.append(toolbar, pre);
   return block;
 }
