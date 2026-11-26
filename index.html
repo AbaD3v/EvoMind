@@ -6,37 +6,61 @@
   <meta name="evomind-space" content="https://abad3v-moonai-8b-qlora-qwen3.hf.space">
   <meta name="evomind-oauth-client-id" content="">
   <meta name="referrer" content="no-referrer">
-  <meta name="theme-color" content="#18202e">
+  <meta name="theme-color" content="#151a23">
+  <meta name="description" content="EvoMind — AI-помощник для вопросов, задач и инструментов. Ответы с понятным ходом работы.">
   <title>EvoMind</title>
   <link rel="stylesheet" href="./styles.css">
   <script type="module" src="./app.js"></script>
 </head>
 <body>
+  <a class="skip-link" href="#question">Перейти к сообщению</a>
+  <button id="sidebar-backdrop" class="sidebar-backdrop" type="button" aria-label="Закрыть историю чатов" tabindex="-1" hidden></button>
   <aside class="sidebar" id="sidebar" aria-label="История чатов">
-    <div class="brand"><span class="brand-icon" aria-hidden="true"><span class="brand-mark"></span></span><span>EvoMind</span></div>
+    <div class="sidebar-heading">
+      <div class="brand">
+        <span class="brand-icon" aria-hidden="true"><span class="brand-mark"></span></span>
+        <span class="brand-wordmark">EvoMind<span class="brand-caption">ТВОЁ ПРОСТРАНСТВО ИДЕЙ</span></span>
+      </div>
+      <button id="sidebar-close" class="small-button icon-button sidebar-close" type="button" aria-label="Закрыть историю чатов">
+        <span class="icon" data-icon="close" aria-hidden="true"></span>
+      </button>
+    </div>
     <button class="new-chat" id="new-chat" type="button">
-      <span class="new-chat-icon" aria-hidden="true"><span class="icon" data-icon="add"></span></span> Новый чат
+      <span class="new-chat-icon" aria-hidden="true"><span class="icon" data-icon="add"></span></span>
+      Новый чат
+      <span class="new-chat-arrow" aria-hidden="true">↗</span>
     </button>
     <div class="history">
       <label class="search"><span class="icon" data-icon="search" aria-hidden="true"></span>
-        <input id="search" type="search" placeholder="Поиск по чатам" aria-label="Поиск по чатам">
+        <input id="search" type="search" placeholder="Найти разговор" aria-label="Поиск по чатам" autocomplete="off">
       </label>
-      <div class="history-title">История</div>
+      <div class="history-title">Твои разговоры</div>
       <nav id="history" aria-label="Сохранённые чаты"></nav>
     </div>
+    <footer class="sidebar-footer">
+      <a class="model-link" href="https://huggingface.co/spaces/AbaD3v/MoonAI-8B_qlora_Qwen3" target="_blank" rel="noopener noreferrer">
+        <span class="model-monogram" aria-hidden="true">M</span>
+        <span><strong>MoonAI · Qwen3</strong><small>Модель в Hugging Face</small></span>
+        <span class="model-arrow" aria-hidden="true">↗</span>
+      </a>
+      <p class="storage-note">История сохраняется в этом браузере</p>
+    </footer>
   </aside>
   <div class="workspace">
     <header class="topbar">
       <button class="small-button icon-button sidebar-toggle" id="sidebar-toggle" type="button" aria-label="История чатов" aria-controls="sidebar" aria-expanded="false">
         <span class="icon" data-icon="menu" aria-hidden="true"></span>
       </button>
-      <div class="topbar-title"><span class="icon" data-icon="chat_bubble" aria-hidden="true"></span><h1 id="chat-title">Новый чат</h1></div>
+      <div class="topbar-title">
+        <span class="icon" data-icon="chat_bubble" aria-hidden="true"></span>
+        <h1 id="chat-title">Новый чат</h1>
+      </div>
       <div class="topbar-actions">
+        <button class="small-button library-button" id="open-library" type="button" aria-label="Открыть инструменты">
+          <span class="icon" data-icon="widgets" aria-hidden="true"></span><span class="library-button-label">Инструменты</span>
+        </button>
         <button class="small-button account-button" id="hf-account" type="button" disabled>
           <span class="account-icon" aria-hidden="true"></span><span id="hf-account-label">Войти через HF</span>
-        </button>
-        <button class="small-button library-button" id="open-library" type="button">
-          <span class="icon" data-icon="widgets" aria-hidden="true"></span> Инструменты
         </button>
         <details class="chat-menu" id="chat-menu">
           <summary class="small-button icon-button" aria-label="Действия с чатом" title="Действия с чатом">
@@ -51,16 +75,27 @@
     </header>
     <main class="conversation" id="conversation" aria-labelledby="chat-title">
       <div class="empty" id="empty">
-        <span class="empty-icon" aria-hidden="true"><span class="brand-mark"></span></span>
-        <h2>Спроси EvoMind</h2>
-        <div class="examples">
-          <button class="example" type="button" data-example>
+        <div class="welcome-heading">
+          <span class="empty-icon" aria-hidden="true"><span class="brand-mark"></span></span>
+          <p class="welcome-eyebrow">МЕСТО ДЛЯ ХОРОШИХ ВОПРОСОВ</p>
+          <h2>Разберёмся вместе.</h2>
+          <p class="welcome-description">От первого вопроса до готового решения.<br>С объяснением, вычислениями и нужными инструментами.</p>
+        </div>
+        <div class="examples" aria-label="Примеры запросов">
+          <button class="example" type="button" data-example data-prompt="Найди НОД чисел F(10) и F(12). Объясни ход решения.">
             <span class="example-icon" aria-hidden="true"><span class="icon" data-icon="timeline"></span></span>
-            <span class="example-label">Найди НОД чисел F(10) и F(12)</span>
+            <span class="example-copy"><span class="example-label">Разобрать задачу</span><span class="example-description">Числа Фибоначчи и общий делитель</span></span>
+            <span class="example-arrow" aria-hidden="true">↗</span>
           </button>
           <button class="example" type="button" data-example data-prompt="Создай и сохрани инструмент для расчёта периметра прямоугольника. Примени его к прямоугольнику со сторонами 7 и 5.">
             <span class="example-icon" aria-hidden="true"><span class="icon" data-icon="widgets"></span></span>
-            <span class="example-label">Инструмент для периметра</span>
+            <span class="example-copy"><span class="example-label">Создать инструмент</span><span class="example-description">Функция, которую можно использовать снова</span></span>
+            <span class="example-arrow" aria-hidden="true">↗</span>
+          </button>
+          <button class="example" type="button" data-example data-prompt="Объясни простыми словами, что такое переобучение модели в машинном обучении. Приведи короткий пример.">
+            <span class="example-icon" aria-hidden="true"><span class="icon" data-icon="chat_bubble"></span></span>
+            <span class="example-copy"><span class="example-label">Понять сложную тему</span><span class="example-description">Машинное обучение простыми словами</span></span>
+            <span class="example-arrow" aria-hidden="true">↗</span>
           </button>
         </div>
       </div>
@@ -70,12 +105,14 @@
       <button class="jump-latest" id="jump-latest" type="button" aria-label="К последнему сообщению" title="К последнему сообщению" hidden>
         <span class="icon" data-icon="arrow_downward" aria-hidden="true"></span>
       </button>
+      <p id="connection-banner" class="connection-banner" role="status" hidden>Нет подключения к интернету. Сообщение можно отправить после восстановления связи.</p>
       <form class="composer" id="composer">
-        <textarea id="question" rows="1" maxlength="6000" placeholder="Спроси EvoMind…" aria-label="Сообщение" required></textarea>
+        <textarea id="question" rows="1" maxlength="6000" placeholder="Что разберём сегодня?" aria-label="Сообщение" aria-describedby="composer-hint" required></textarea>
         <button id="send" type="submit" title="Отправить · Enter" aria-label="Отправить" disabled>
           <span class="icon" data-icon="arrow_forward" aria-hidden="true"></span>
         </button>
       </form>
+      <div class="composer-hint" id="composer-hint"><span>Ответы AI стоит проверять</span><span class="keyboard-hint"><kbd>Enter</kbd> отправить · <kbd>Shift + Enter</kbd> новая строка</span></div>
     </div>
   </div>
   <dialog id="hf-account-dialog" class="panel account-panel" aria-labelledby="hf-account-title">
@@ -89,13 +126,23 @@
       <button class="small-button" id="hf-logout" type="button" hidden>Выйти из EvoMind</button>
     </div>
   </dialog>
-  <dialog id="library" class="panel" aria-labelledby="library-title">
-    <div class="panel-header"><h2 id="library-title">Инструменты</h2>
+  <dialog id="library" class="panel library-panel" aria-labelledby="library-title" aria-describedby="library-description">
+    <div class="panel-header">
+      <div><p class="panel-eyebrow">БИБЛИОТЕКА EVOMIND</p><h2 id="library-title">Инструменты</h2></div>
       <form method="dialog">
-        <button class="small-button icon-button" aria-label="Закрыть"><span class="icon" data-icon="close" aria-hidden="true"></span></button>
+        <button class="small-button icon-button" aria-label="Закрыть инструменты"><span class="icon" data-icon="close" aria-hidden="true"></span></button>
       </form>
     </div>
-    <div id="library-content" class="panel-content" aria-live="polite"></div>
+    <div class="library-intro">
+      <p id="library-description">Готовые функции для твоих задач. Открой инструмент, чтобы посмотреть описание, версию и способы применения.</p>
+      <div class="library-toolbar">
+        <label class="search library-search"><span class="icon" data-icon="search" aria-hidden="true"></span><input id="library-search" type="search" placeholder="Найти инструмент" aria-label="Поиск инструментов" autocomplete="off"></label>
+        <button id="library-refresh" class="small-button" type="button">Обновить</button>
+      </div>
+      <p id="library-count" class="library-count" role="status"></p>
+    </div>
+    <div id="library-state" class="library-state" role="status" hidden></div>
+    <div id="library-content" class="panel-content library-results"></div>
   </dialog>
   <dialog id="rename-dialog" class="rename-dialog" aria-labelledby="rename-title">
     <form method="dialog">

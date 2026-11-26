@@ -1,6 +1,9 @@
 import { completeHfLogin, readHfSession, signOutFromHf, startHfLogin } from "./hf-auth.mjs";
 import { renderHtmlCard } from "./card-preview.mjs";
-import { readQuotaError, streamSpaceEvents } from "./space-events.mjs";
+import { streamSpaceEvents } from "./space-events.mjs";
+import { classifyRequestError } from "./request-errors.mjs";
+import { renderMarkdown, renderCodeBlock } from "./answer-content.mjs";
+import { createToolLibrary } from "./tool-library.mjs";
 
 const CLIENT_MODULE = "https://cdn.jsdelivr.net/npm/@gradio/client@2.8.0/dist/index.min.js";
 const SPACE = document.querySelector('meta[name="evomind-space"]').content;
@@ -14,6 +17,7 @@ const TURN_STATUS = {
   tools: "Работаю с инструментами…",
   ready: "Ответ готов",
   error: "Не удалось завершить запрос",
+  cancelled: "Запрос остановлен",
 };
 const byId = (id) => document.getElementById(id);
 const thread = byId("thread");
@@ -29,6 +33,13 @@ const hfLogout = byId("hf-logout");
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const seconds = new Intl.NumberFormat("ru", { maximumFractionDigits: 1 });
 const views = new Map();
+const stop = element("button", "stop-generation", "Стоп");
+stop.id = "stop-generation";
+stop.type = "button";
+stop.title = "Остановить ответ";
+stop.setAttribute("aria-label", "Остановить ответ");
+stop.hidden = true;
+composer.append(stop);
 
 let chats = readChats();
 let active = chats[0] ?? newChat();
@@ -36,16 +47,34 @@ let processing = null;
 let connection;
 let hfSession = readHfSession();
 let hfLoading = true;
+let requestController;
+
+function protocolError() {
+  return Object.assign(new Error("INVALID_RESPONSE"), { name: "ProtocolError", code: "INVALID_RESPONSE" });
+}
+
+function normalizeStep(step) {
+  if (!step || !["string", "number"].includes(typeof step.id) || typeof step.title !== "string") return null;
+  return { ...step, status: ["running", "success", "error"].includes(step.status) ? step.status : "running",
+    details: Array.isArray(step.details) ? step.details.filter((detail) => detail && typeof detail.text === "string")
+      .map((detail) => ({ label: typeof detail.label === "string" ? detail.label : "Подробности", text: detail.text, code: Boolean(detail.code) })) : [] };
+}
 
 function readChats() {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]").map((chat) => ({
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    if (!Array.isArray(saved)) return [];
+    return saved.filter((chat) => chat && typeof chat.id === "string" && typeof chat.title === "string" && Array.isArray(chat.turns)).map((chat) => ({
       ...chat,
-      turns: chat.turns.map((turn) => turn.answer ? turn : {
+      turns: chat.turns.filter((turn) => turn && typeof turn.id === "string" && typeof turn.question === "string").map((turn) => ({
         ...turn,
-        steps: turn.steps.map((step) => step.status === "running" ? interruptedStep(step) : step),
-        answer: { text: "Запрос прервался при закрытии страницы.", ok: false },
-      }),
+        steps: (Array.isArray(turn.steps) ? turn.steps : []).map(normalizeStep).filter(Boolean)
+          .map((step) => step.status === "running" ? interruptedStep(step) : step),
+        answer: typeof turn.answer?.text === "string" && typeof turn.answer.ok === "boolean" ? turn.answer : {
+          text: "Запрос прервался при закрытии страницы.", ok: false,
+          error: { kind: "interrupted", title: "Запрос был прерван", message: "Страница закрылась до получения ответа. Запрос можно повторить.", retryable: true },
+        },
+      })),
     }));
   } catch {
     return [];
@@ -156,7 +185,7 @@ function shouldOpenWork(turn) {
 
 function renderTurnStatus(turn) {
   const { status, statusIcon, statusLabel } = views.get(turn.id);
-  const state = turn.answer ? (turn.answer.ok ? "ready" : "error") : turn.progress?.state ?? "connecting";
+  const state = turn.answer ? (turn.answer.cancelled ? "cancelled" : turn.answer.ok ? "ready" : "error") : turn.progress?.state ?? "connecting";
   const label = (turn.answer ? null : turn.progress?.label) ?? TURN_STATUS[state];
   if (statusLabel.textContent !== label) statusLabel.textContent = label;
   status.dataset.state = state;
@@ -192,6 +221,8 @@ function makeTurn(turn) {
   avatar.setAttribute("aria-hidden", "true");
   avatar.append(element("span", "brand-mark"));
   const stack = element("div", "assistant-stack");
+  const meta = element("div", "assistant-meta");
+  const name = element("h2", "assistant-name", "EvoMind");
   const status = element("p", "turn-status");
   status.setAttribute("role", "status");
   const statusIcon = lightIcon("check");
@@ -202,7 +233,7 @@ function makeTurn(turn) {
   const heading = element("summary");
   const count = element("span", "work-count");
   count.title = "Количество шагов";
-  heading.append(lightIcon("timeline"), element("span", "work-title", "Ход работы"), count, lightIcon("chevron_right"));
+  heading.append(lightIcon("timeline"), element("span", "work-title", "Ход решения"), count, lightIcon("chevron_right"));
   const steps = element("div", "steps");
   work.append(heading, steps);
   work.open = shouldOpenWork(turn);
@@ -215,7 +246,8 @@ function makeTurn(turn) {
   const actions = element("div", "reply-actions");
   panel.hidden = work.hidden = reply.hidden = actions.hidden = true;
   panel.append(reply, actions, work);
-  stack.append(status, panel);
+  meta.append(name, status);
+  stack.append(meta, panel);
   assistant.append(avatar, stack);
   row.append(bubble, assistant);
   const view = { row, assistant, status, statusIcon, statusLabel, panel, work, count, steps, reply, actions, stepRows: new Map() };
@@ -358,8 +390,14 @@ function renderResult({ value, input, inputLabel, code }) {
 
 function renderPresentation({ lead, explanation, tool_note: toolNote }) {
   const block = element("div", "answer-presentation");
-  block.append(element("p", "answer-lead", lead));
-  if (explanation) block.append(element("p", "answer-explanation", explanation));
+  const title = renderMarkdown(lead);
+  title.classList.add("answer-lead");
+  block.append(title);
+  if (explanation) {
+    const body = renderMarkdown(explanation);
+    body.classList.add("answer-explanation");
+    block.append(body);
+  }
   if (toolNote) block.append(element("p", "answer-tool-note", toolNote));
   return block;
 }
@@ -417,7 +455,7 @@ function renderWebResult(result) {
 
 function renderAnswer(turn) {
   const { assistant, status, panel, reply, actions, work } = views.get(turn.id);
-  const { text, ok, presentation, guestQuota, webResult } = turn.answer;
+  const { text, ok, presentation, guestQuota, webResult, error, cancelled } = turn.answer;
   const fencedCode = /\n{2}````python\n([\s\S]*?)\n````\s*$/;
   const match = text.match(fencedCode);
   const prefix = match ? text.slice(0, match.index).trimEnd() : text;
@@ -425,8 +463,9 @@ function renderAnswer(turn) {
   const sourceNamed = match && prefix.endsWith(sourceLabel);
   const body = sourceNamed ? prefix.slice(0, -sourceLabel.length) : prefix;
   const result = ok && !presentation ? readResult(body) : null;
-  const answerBody = presentation ? renderPresentation(presentation)
-    : result ? renderResult(result) : element("div", "", body);
+  const answerBody = error ? renderError(error, turn)
+    : presentation ? renderPresentation(presentation)
+    : result ? renderResult(result) : renderMarkdown(body);
   reply.replaceChildren(answerBody);
   const webView = renderWebResult(webResult);
   if (webView && webResult.type === "web_search") {
@@ -438,11 +477,8 @@ function renderAnswer(turn) {
     if (presentation?.tool_note) reply.append(element("p", "answer-tool-note", presentation.tool_note));
   }
   if (match) {
-    const pre = element("pre");
-    pre.append(element("code", "", match[1]));
-    const source = element("div", "answer-source");
-    if (sourceNamed) source.append(element("p", "answer-label", "Код инструмента"));
-    source.append(pre);
+    const source = element("details", "answer-source");
+    source.append(element("summary", "answer-label", sourceNamed ? "Код инструмента" : "Показать код"), renderCodeBlock(match[1], "python"));
     reply.append(source);
   }
   if (guestQuota) {
@@ -461,6 +497,7 @@ function renderAnswer(turn) {
     reply.append(links);
   }
   reply.dataset.ok = String(ok);
+  reply.dataset.cancelled = String(Boolean(cancelled));
   assistant.dataset.complete = "true";
   if (!work.contains(document.activeElement)) work.open = shouldOpenWork(turn);
   panel.hidden = reply.hidden = false;
@@ -495,13 +532,62 @@ function renderAnswer(turn) {
       label.textContent = "Копировать";
     }, 1800);
   };
-  actions.replaceChildren(copy);
+  actions.replaceChildren();
+  if (ok) actions.append(copy);
+  if (cancelled) {
+    const edit = element("button", "copy", "Изменить сообщение");
+    edit.type = "button";
+    edit.onclick = () => prepareQuestion(turn.question);
+    actions.append(edit);
+  }
+  if (Number.isFinite(turn.elapsedMs) && ok) actions.append(element("span", "answer-time", `${seconds.format(turn.elapsedMs / 1000)} с`));
   actions.hidden = false;
 }
 
+function prepareQuestion(message) {
+  question.value = message;
+  syncComposer();
+  question.focus();
+}
+
+function renderError(error, turn) {
+  const card = element("div", "error-card");
+  card.dataset.kind = error.kind || "generic";
+  card.setAttribute("role", error.kind === "cancelled" ? "status" : "alert");
+  card.append(element("h3", "error-title", error.title), element("p", "error-message", error.message));
+  const actions = element("div", "error-actions");
+  if (error.retryable) {
+    const retry = element("button", "small-button retry-answer", "Повторить запрос");
+    retry.type = "button";
+    retry.disabled = Boolean(processing) || hfLoading || !navigator.onLine;
+    retry.onclick = () => { if (!processing && !hfLoading) sendMessage(turn.question); };
+    actions.append(retry);
+  }
+  if (error.login) {
+    const login = element("button", "small-button account-button", "Войти через HF");
+    login.type = "button";
+    login.onclick = beginHfLogin;
+    actions.append(login);
+  }
+  if (error.openSpace) {
+    const link = element("a", "small-button quota-link", "Открыть Space ↗");
+    link.href = SPACE_PAGE;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    actions.append(link);
+  }
+  if (actions.childElementCount) card.append(actions);
+  return card;
+}
+
 function setSidebar(open) {
+  open = open && matchMedia("(max-width: 780px)").matches;
   byId("sidebar").classList.toggle("open", open);
   byId("sidebar-toggle").setAttribute("aria-expanded", String(open));
+  byId("sidebar-backdrop").hidden = !open;
+  document.querySelector(".workspace").inert = open;
+  byId("sidebar").inert = !open && matchMedia("(max-width: 780px)").matches;
+  if (open) byId("sidebar-close").focus();
 }
 
 function selectChat(chat) {
@@ -544,15 +630,23 @@ function showLatestAnswer(turn) {
 }
 
 function syncComposer() {
-  send.disabled = hfLoading || Boolean(processing) || !question.value.trim();
+  send.disabled = hfLoading || Boolean(processing) || !question.value.trim() || !navigator.onLine;
+  send.hidden = Boolean(processing);
+  stop.hidden = !processing;
   composer.dataset.busy = String(Boolean(processing));
+  byId("connection-banner").hidden = navigator.onLine;
+  for (const button of document.querySelectorAll(".retry-answer")) button.disabled = Boolean(processing) || hfLoading || !navigator.onLine;
 }
 
 function connect(token) {
   if (connection && connection.token === token) return connection.promise;
-  const promise = import(CLIENT_MODULE).then(({ Client }) => Client.connect(SPACE, {
+  let timer;
+  const client = import(CLIENT_MODULE).then(({ Client }) => Client.connect(SPACE, {
     events: ["data", "status"], token,
   }));
+  const promise = Promise.race([client, new Promise((_, reject) => {
+    timer = setTimeout(() => reject(Object.assign(new Error("REQUEST_TIMEOUT"), { name: "TimeoutError" })), 30_000);
+  })]).finally(() => clearTimeout(timer));
   connection = { token, promise };
   promise.catch(() => {
     if (connection?.promise === promise) connection = null;
@@ -599,17 +693,24 @@ function clearHfSession() {
   syncHfButton();
 }
 
-function quotaAnswer(message, authenticated) {
-  const quota = readQuotaError(message);
-  if (!quota) return null;
-  const limit = authenticated ? "доступном лимите" : "гостевом лимите";
-  const text = quota.requested !== undefined
-    ? `Для запроса нужно ${seconds.format(quota.requested)} с GPU, а в ${limit} осталось ${seconds.format(quota.remaining)} с.`
-    : `ZeroGPU отклонил запрос по ${authenticated ? "лимиту GPU" : "гостевому лимиту"}.`;
-  return { text, ok: false, guestQuota: !authenticated };
+async function connectForRequest(token, signal) {
+  let timer;
+  let abort;
+  try {
+    return await Promise.race([connect(token), new Promise((_, reject) => {
+      timer = setTimeout(() => reject(Object.assign(new Error("REQUEST_TIMEOUT"), { name: "TimeoutError" })), 30_000);
+      abort = () => reject(Object.assign(new Error("REQUEST_CANCELLED"), { name: "AbortError" }));
+      signal.addEventListener("abort", abort, { once: true });
+      if (signal.aborted) abort();
+    })]);
+  } finally {
+    clearTimeout(timer);
+    signal.removeEventListener("abort", abort);
+  }
 }
 
 async function sendMessage(message) {
+  if (processing || hfLoading || !message.trim() || !navigator.onLine) return;
   if (hfSession && hfSession.expiresAt <= Date.now()) {
     clearHfSession();
     showHfDialog("Срок входа истёк. Войди заново, чтобы использовать личную квоту.");
@@ -618,6 +719,9 @@ async function sendMessage(message) {
   const token = hfSession?.token;
   const chat = active;
   const turn = { id: crypto.randomUUID(), question: message, steps: [], answer: null };
+  const started = performance.now();
+  const controller = new AbortController();
+  requestController = controller;
   if (!chat.turns.length) chat.title = message.replace(/\s+/g, " ").slice(0, 70);
   chat.turns.push(turn);
   chats = [chat, ...chats.filter((recent) => recent !== chat)];
@@ -634,15 +738,15 @@ async function sendMessage(message) {
   saveChats();
 
   try {
-    const client = await connect(token);
-    if (!client.config.dependencies.some((endpoint) => endpoint.api_name === "respond_events")) {
-      throw new Error("В Space нет потока событий. Нужно обновить его версию.");
+    const client = await connectForRequest(token, controller.signal);
+    if (!Array.isArray(client.config?.dependencies) || !client.config.dependencies.some((endpoint) => endpoint.api_name === "respond_events")) {
+      throw protocolError();
     }
     let retryLabel;
     const job = streamSpaceEvents(client, message, (budget) => {
       retryLabel = `Повторяю с бюджетом ${seconds.format(budget)} с GPU…`;
       setTurnProgress(turn, "waiting", retryLabel);
-    });
+    }, { signal: controller.signal });
     for await (const event of job) {
       if (event.type === "status") {
         if (event.stage === "pending" && !turn.steps.length) {
@@ -655,15 +759,33 @@ async function sendMessage(message) {
         continue;
       }
       if (event.type !== "data") continue;
-      const raw = event.data[0];
-      const update = typeof raw === "string" ? JSON.parse(raw) : raw;
+      const raw = event.data?.[0];
+      let update = typeof raw === "string" ? JSON.parse(raw) : raw;
+      if (!update || typeof update.type !== "string") throw protocolError();
       if (update.type === "answer") {
+        if (typeof update.text !== "string" || typeof update.ok !== "boolean") throw protocolError();
+        if (update.ok && !update.text.trim() && !update.presentation?.lead?.trim?.() && !renderWebResult(update.web_result)) throw protocolError();
         turn.answer = { text: update.text, ok: update.ok };
-        if (typeof update.presentation?.lead === "string") turn.answer.presentation = update.presentation;
-        if (update.web_result) turn.answer.webResult = update.web_result;
+        if (!update.ok) {
+          const failure = classifyRequestError(update.text, { authenticated: Boolean(token), online: navigator.onLine });
+          if (failure.kind === "generic") {
+            // Agent validation failures are useful feedback, not transport errors.
+            failure.title = "Задача не завершена";
+            failure.message = update.text || "Попробуй уточнить условие задачи и отправить её снова.";
+          }
+          turn.answer.error = failure;
+          if (failure.kind === "auth" && hfSession?.token === token) clearHfSession();
+        }
+        if (update.ok && typeof update.presentation?.lead === "string") turn.answer.presentation = {
+          lead: update.presentation.lead,
+          explanation: typeof update.presentation.explanation === "string" ? update.presentation.explanation : "",
+          tool_note: typeof update.presentation.tool_note === "string" ? update.presentation.tool_note : "",
+        };
+        if (update.ok && update.web_result) turn.answer.webResult = update.web_result;
         break;
       }
       if (update.type === "thinking") {
+        if (typeof update.delta !== "string") throw protocolError();
         const step = turn.steps.find((entry) => entry.id === update.id);
         if (!step?.streams_text) continue;
         step.thinkingText = (step.thinkingText ?? "") + update.delta;
@@ -674,6 +796,8 @@ async function sendMessage(message) {
         continue;
       }
       if (update.type !== "step") continue;
+      update = normalizeStep(update);
+      if (!update) throw protocolError();
       const position = turn.steps.findIndex((step) => step.id === update.id);
       const previous = turn.steps[position];
       if (previous && isThinking(previous)) {
@@ -687,21 +811,12 @@ async function sendMessage(message) {
       updateTurnProgress(turn, update);
       if (active === chat) scrollWithUpdate(() => renderStep(turn, update));
     }
-    if (!turn.answer) throw new Error("Поток событий завершился до получения ответа.");
+    if (!turn.answer) throw protocolError();
   } catch (error) {
-    const message = error.message || String(error);
-    const quota = quotaAnswer(message, Boolean(token));
-    let text = "Не удалось получить ответ от Space. Попробуй отправить запрос ещё раз.";
-    if (/нет потока событий/.test(message)) text = message;
-    if (token && !quota && /\b(?:401|403|unauthorized|forbidden)\b/i.test(message)) {
-      if (hfSession?.token === token) clearHfSession();
-      text = "Space отклонил авторизацию Hugging Face. Войди заново и повтори запрос.";
-    } else if (!turn.steps.length && /fetch|config|runtime|connect|network/i.test(message)) {
-      text = "Не удалось подключиться к Space. Проверь, запущен ли он на Hugging Face.";
-    }
+    const failure = classifyRequestError(error, { authenticated: Boolean(token), online: navigator.onLine });
+    if (failure.kind === "auth" && hfSession?.token === token) clearHfSession();
     if (connection?.token === token) connection = null;
-    turn.answer = quota ?? { text, ok: false };
-    console.warn("EvoMind:", token ? message.replaceAll(token, "[скрыто]") : message);
+    turn.answer = { text: failure.message, ok: false, error: failure, cancelled: failure.kind === "cancelled" };
   } finally {
     for (const [position, step] of turn.steps.entries()) {
       if (step.status !== "running") continue;
@@ -711,12 +826,21 @@ async function sendMessage(message) {
       if (active === chat) renderStep(turn, stopped);
     }
     delete turn.progress;
+    turn.elapsedMs = performance.now() - started;
+    processing = null;
+    requestController = null;
     if (active === chat) showLatestAnswer(turn);
     saveChats();
-    processing = null;
     syncComposer();
   }
 }
+
+stop.onclick = () => requestController?.abort();
+window.addEventListener("online", syncComposer);
+window.addEventListener("offline", () => {
+  syncComposer();
+  // The stream deadline covers a lost connection; the user can stop immediately.
+});
 
 composer.onsubmit = (event) => {
   event.preventDefault();
@@ -756,6 +880,23 @@ byId("new-chat").onclick = () => {
 };
 byId("search").oninput = renderHistory;
 byId("sidebar-toggle").onclick = () => setSidebar(!byId("sidebar").classList.contains("open"));
+function closeSidebar() {
+  setSidebar(false);
+  byId("sidebar-toggle").focus();
+}
+byId("sidebar-close").onclick = closeSidebar;
+byId("sidebar-backdrop").onclick = closeSidebar;
+matchMedia("(max-width: 780px)").addEventListener("change", () => setSidebar(false));
+document.addEventListener("keydown", (event) => {
+  if (!byId("sidebar").classList.contains("open")) return;
+  if (event.key === "Escape") { event.preventDefault(); closeSidebar(); }
+  if (event.key === "Tab") {
+    const items = [...byId("sidebar").querySelectorAll("button,a,input")].filter((item) => !item.disabled && item.getClientRects().length);
+    const first = items[0], last = items.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  }
+});
 conversation.onclick = () => setSidebar(false);
 hfButton.onclick = beginHfLogin;
 hfLogout.onclick = () => {
@@ -778,27 +919,15 @@ for (const example of document.querySelectorAll("[data-example]")) {
   };
 }
 
-const library = byId("library");
-byId("open-library").onclick = async () => {
-  const content = byId("library-content");
-  content.textContent = "Загружаю библиотеку…";
-  library.showModal();
-  try {
-    const client = await connect(readHfSession()?.token);
-    const response = await client.predict("/list_tools", []);
-    const tools = response.data[0];
-    content.replaceChildren();
-    if (!tools.length) content.textContent = "В библиотеке пока нет инструментов.";
-    for (const tool of tools) {
-      const card = element("article", "library-card");
-      card.append(element("strong", "", tool.name), element("small", "", `${tool.tool_id} · v${tool.version}`),
-        element("p", "", tool.description));
-      content.append(card);
-    }
-  } catch {
-    content.textContent = "Не удалось загрузить библиотеку. Проверь состояние Space.";
-  }
-};
+const library = createToolLibrary({
+  connect: () => connect(readHfSession()?.token),
+  onUse: prepareQuestion,
+  onAuthError: clearHfSession,
+  onLogin: beginHfLogin,
+  onConnectionError: () => { connection = null; },
+  spaceUrl: SPACE_PAGE,
+});
+byId("open-library").onclick = library.open;
 
 const rename = byId("rename-dialog");
 const renameValue = byId("rename-value");
